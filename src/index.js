@@ -1,6 +1,6 @@
+import { ClerkProvider } from '@clerk/clerk-react';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ClerkProvider } from '@clerk/clerk-react';
 import App from './App';
 
 // Import your publishable key
