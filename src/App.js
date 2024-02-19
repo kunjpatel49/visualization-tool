@@ -5,6 +5,9 @@ import AlgoScreen from './screens/AlgoScreen';
 import Cookies from 'js-cookie';
 import HomeScreen from './screens/HomeScreen';
 import ReactGA from 'react-ga4';
+// eslint-disable-next-line sort-imports
+import { SignOutButton, SignInButton, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { Redirect } from "react-router-dom";
 
 const App = () => {
 	ReactGA.initialize('G-0ERQ9E89XM');
@@ -34,22 +37,30 @@ const App = () => {
 	}
 
 	return (
-		<Router basename={process.env.PUBLIC_URL + '/'}>
-			<Switch>
-				<Route
-					exact
-					path={['/', '/about']}
-					render={props => (
-						<HomeScreen {...props} theme={theme} toggleTheme={toggleTheme} />
-					)}
-				/>
-				<Route
-					render={props => (
-						<AlgoScreen {...props} theme={theme} toggleTheme={toggleTheme} />
-					)}
-				/>
-			</Switch>
-		</Router>
+		<div>
+			<SignedOut>
+				<SignInButton />
+			</SignedOut>
+			<SignedIn>
+				<Router basename={process.env.PUBLIC_URL + '/'}>
+					<Switch>
+						<Route
+							exact
+							path={['/', '/about']}
+							render={props => (
+								<HomeScreen {...props} theme={theme} toggleTheme={toggleTheme} />
+							)}
+						/>
+						<Route
+							render={props => (
+								<AlgoScreen {...props} theme={theme} toggleTheme={toggleTheme} />
+							)}
+						/>
+					</Switch>
+				</Router>
+			</SignedIn>
+		</div>
+
 	);
 };
 
