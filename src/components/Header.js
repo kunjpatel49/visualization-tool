@@ -1,3 +1,5 @@
+import { SignOutButton } from '@clerk/clerk-react';
+// eslint-disable-next-line sort-imports
 import {
 	BsEnvelopeFill,
 	BsFillHouseFill,
@@ -8,7 +10,8 @@ import {
 } from 'react-icons/bs';
 import Blob from './Blob';
 import { IconContext } from 'react-icons';
-import { Link } from 'react-router-dom';
+// eslint-disable-next-line sort-imports
+import { Link, Redirect } from 'react-router-dom';
 import React from 'react';
 import { RxHamburgerMenu } from 'react-icons/rx';
 
@@ -82,6 +85,9 @@ class Header extends React.Component {
 								<BsEnvelopeFill size={20} />
 								&nbsp;&nbsp;Feedback
 							</a>
+						</li>
+						<li>
+							<SignOutButton signOutCallback={() => Redirect.call('/')} />
 						</li>
 					</ul>
 				</div>
