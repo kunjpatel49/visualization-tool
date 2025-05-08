@@ -27,11 +27,12 @@
 import Algorithm, {
 	addControlToAlgorithmBar,
 	addDivisorToAlgorithmBar,
+	addDropDownGroupToAlgorithmBar,
 	addGroupToAlgorithmBar,
 	addLabelToAlgorithmBar,
 	addRadioButtonGroupToAlgorithmBar,
 } from './Algorithm.js';
-import { act } from '../anim/AnimationMain';
+import { act } from '../anim/AnimationMain.js';
 import pseudocodeText from '../pseudocode.json';
 
 const MAX_ARRAY_SIZE = 18;
@@ -39,7 +40,7 @@ const MAX_ARRAY_SIZE = 18;
 const INFO_MSG_X = 25;
 const INFO_MSG_Y = 15;
 
-const ARRAY_START_X = 100;
+const ARRAY_START_X = 475;
 const ARRAY_START_Y = 120;
 const ARRAY_ELEM_WIDTH = 50;
 const ARRAY_ELEM_HEIGHT = 50;
@@ -48,9 +49,12 @@ const COMP_COUNT_X = 100;
 const COMP_COUNT_Y = 50;
 
 const CODE_START_X = 50;
-const CODE_START_Y = 180;
+const CODE_START_Y = 100;
 
-export default class QuickSort extends Algorithm {
+let definedPivotIndex = 0;
+let setPivotVerticalGroup;
+
+export default class Quickselect extends Algorithm {
 	constructor(am, w, h) {
 		super(am, w, h);
 		this.addControls();
@@ -64,7 +68,7 @@ export default class QuickSort extends Algorithm {
 		const verticalGroup = addGroupToAlgorithmBar(false);
 
 		addLabelToAlgorithmBar(
-			'Comma seperated list (e.g. "3,1,2"). Max 18 elements & no elements > 999',
+			`Comma seperated list (e.g. "3,1,2"). Max ${MAX_ARRAY_SIZE} elements & no elements > 999`,
 			verticalGroup,
 		);
 
@@ -74,56 +78,100 @@ export default class QuickSort extends Algorithm {
 		this.listField = addControlToAlgorithmBar('Text', '', horizontalGroup);
 		this.listField.onkeydown = this.returnSubmit(
 			this.listField,
-			this.sortCallback.bind(this),
+			this.runCallback.bind(this),
 			60,
 			false,
 		);
 		this.controls.push(this.listField);
 
-		// Sort button
-		this.sortButton = addControlToAlgorithmBar('Button', 'Sort', horizontalGroup);
-		this.sortButton.onclick = this.sortCallback.bind(this);
-		this.controls.push(this.sortButton);
+		addLabelToAlgorithmBar('kᵗʰ element (1 indexed)', horizontalGroup);
+
+		// k text field
+		this.kField = addControlToAlgorithmBar('Text', '', horizontalGroup);
+		this.kField.style.textAlign = 'center';
+		this.kField.onkeydown = this.returnSubmit(
+			this.kField,
+			this.runCallback.bind(this),
+			2,
+			true,
+		);
+		this.controls.push(this.kField);
+
+		// Run button
+		this.findButton = addControlToAlgorithmBar('Button', 'Run', horizontalGroup);
+		this.findButton.onclick = this.runCallback.bind(this);
+		this.controls.push(this.findButton);
 
 		addDivisorToAlgorithmBar();
 
-		const verticalGroup2 = addGroupToAlgorithmBar(false);
-
-		// Random data button
-		this.randomButton = addControlToAlgorithmBar('Button', 'Random', verticalGroup2);
-		this.randomButton.onclick = this.randomCallback.bind(this);
-		this.controls.push(this.randomButton);
+		// Examples dropdown
+		this.exampleDropdown = addDropDownGroupToAlgorithmBar(
+			[
+				['', 'Select Example'],
+				['1,2,3,4,5,6,7,8,9;k=4', 'Sorted'],
+				['9,8,7,6,5,4,3,2,1;k=4', 'Reverse Sorted'],
+				['2,3,4,5,6,7,8,9,1;k=4', 'Almost Sorted'],
+				['Random', 'Random'],
+			],
+			'Example',
+		);
+		this.exampleDropdown.onclick = this.exampleCallback.bind(this);
+		this.controls.push(this.exampleDropdown);
 
 		// Clear button
-		this.clearButton = addControlToAlgorithmBar('Button', 'Clear', verticalGroup2);
+		this.clearButton = addControlToAlgorithmBar('Button', 'Clear');
 		this.clearButton.onclick = this.clearCallback.bind(this);
 		this.controls.push(this.clearButton);
 
 		addDivisorToAlgorithmBar();
-
 		// Toggles
 		const pivotButtonList = addRadioButtonGroupToAlgorithmBar(
-			['Random pivot', 'Min element', 'First element', 'Perfect pivot'],
+			['Random pivot', 'Perfect pivot', 'Min element', 'Set index'],
 			'Traversals',
 		);
 
+		// Set Pivot Index field
+		setPivotVerticalGroup = addGroupToAlgorithmBar(false);
+		this.loadFieldLabel = addLabelToAlgorithmBar('Pivot Index', setPivotVerticalGroup);
+		const setPivotVerticalTop = addGroupToAlgorithmBar(true, setPivotVerticalGroup);
+		const setPivotPercentGroup = addGroupToAlgorithmBar(true, setPivotVerticalTop);
+		this.setPivotField = addControlToAlgorithmBar('Text', '', setPivotPercentGroup);
+		this.setPivotField.setAttribute('value', '0');
+		this.setPivotField.size = 1;
+		setPivotVerticalGroup.setAttribute('style', 'display:none');
+		this.setPivotField.addEventListener('input', function () {
+			let value = parseInt(this.value.trim());
+			value = isNaN(value) ? 0 : Math.min(Math.max(value, 0), 17);
+			this.value = value;
+			definedPivotIndex = value;
+		});
+
+		// Choose Pivot Type
 		this.randomPivotSelect = pivotButtonList[0];
-		this.minPivotSelect = pivotButtonList[1];
-		this.firstPivotSelect = pivotButtonList[2];
-		this.perfectPivotSelect = pivotButtonList[3];
-		this.randomPivotSelect.onclick = () => (this.pivotType = 'random');
-		this.minPivotSelect.onclick = () => (this.pivotType = 'min');
-		this.firstPivotSelect.onclick = () => (this.pivotType = 'first');
-		this.perfectPivotSelect.onclick = () => (this.pivotType = 'perfect');
+		this.perfectPivotSelect = pivotButtonList[1];
+		this.minPivotSelect = pivotButtonList[2];
+		this.setPivotSelect = pivotButtonList[3];
+		this.randomPivotSelect.onclick = () => this.setPivotType('random');
+		this.perfectPivotSelect.onclick = () => this.setPivotType('perfect');
+		this.minPivotSelect.onclick = () => this.setPivotType('min');
+		this.setPivotSelect.onclick = () => this.setPivotType('set');
 		this.randomPivotSelect.checked = true;
-		this.pivotType = 'random';
+		this.setPivotType('random');
 
 		this.controls.push(this.randomPivotSelect);
 		this.controls.push(this.perfectPivotSelect);
-		this.controls.push(this.firstPivotSelect);
 		this.controls.push(this.minPivotSelect);
+		this.controls.push(this.setPivotSelect);
 
 		addDivisorToAlgorithmBar();
+	}
+
+	setPivotType(type) {
+		this.pivotType = type;
+		setPivotVerticalGroup.setAttribute('style', 'display:none');
+		if (this.pivotType === 'set') {
+			setPivotVerticalGroup.setAttribute('style', 'display:block');
+		}
 	}
 
 	setup() {
@@ -134,8 +182,6 @@ export default class QuickSort extends Algorithm {
 		this.iPointerID = 0;
 		this.jPointerID = 0;
 		this.pPointerID = 0;
-		this.iLabel = 0;
-		this.jLabel = 0;
 		this.comparisonCountID = this.nextIndex++;
 
 		this.compCount = 0;
@@ -147,9 +193,6 @@ export default class QuickSort extends Algorithm {
 			COMP_COUNT_Y,
 		);
 
-		this.infoLabelID = this.nextIndex++;
-		this.cmd(act.createLabel, this.infoLabelID, '', INFO_MSG_X, INFO_MSG_Y, 0);
-
 		this.swapCountID = this.nextIndex++;
 		this.swapCount = 0;
 		this.cmd(
@@ -160,7 +203,10 @@ export default class QuickSort extends Algorithm {
 			COMP_COUNT_Y,
 		);
 
-		this.pseudocode = pseudocodeText.QuickSort;
+		this.infoLabelID = this.nextIndex++;
+		this.cmd(act.createLabel, this.infoLabelID, '', INFO_MSG_X, INFO_MSG_Y, 0);
+
+		this.pseudocode = pseudocodeText.Quickselect;
 		this.codeID = this.addCodeToCanvasBaseAll(
 			this.pseudocode,
 			'find',
@@ -181,33 +227,46 @@ export default class QuickSort extends Algorithm {
 		this.arrayID = [];
 		this.iPointerID = 0;
 		this.jPointerID = 0;
-		this.iLabel = 0;
-		this.jLabel = 0;
 		this.pPointerID = 0;
 		this.compCount = 0;
 		this.swapCount = 0;
 	}
 
-	sortCallback() {
+	runCallback() {
 		const list = this.listField.value.split(',').filter(x => x !== '');
+		const k = this.kField.value;
 		this.implementAction(this.clear.bind(this), true);
-		this.implementAction(this.sort.bind(this), list);
+		this.implementAction(this.run.bind(this), list, k);
 	}
 
-	randomCallback() {
-		//Generate between 5 and 15 random values
-		const RANDOM_ARRAY_SIZE = Math.floor(Math.random() * 9) + 5;
-		const MIN_DATA_VALUE = 1;
-		const MAX_DATA_VALUE = 14;
-		let values = '';
-		for (let i = 0; i < RANDOM_ARRAY_SIZE; i++) {
-			values += (
-				Math.floor(Math.random() * (MAX_DATA_VALUE - MIN_DATA_VALUE)) + MIN_DATA_VALUE
-			).toString();
-			if (i < RANDOM_ARRAY_SIZE - 1) {
-				values += ',';
-			}
+	exampleCallback() {
+		const selection = this.exampleDropdown.value;
+		if (!selection) {
+			return;
 		}
+
+		let values = '';
+		if (selection === 'Random') {
+			//Generate between 5 and 15 random values
+			const RANDOM_ARRAY_SIZE = Math.floor(Math.random() * 9) + 5;
+			const MIN_DATA_VALUE = 1;
+			const MAX_DATA_VALUE = 14;
+			let values = '';
+			for (let i = 0; i < RANDOM_ARRAY_SIZE; i++) {
+				values += (
+					Math.floor(Math.random() * (MAX_DATA_VALUE - MIN_DATA_VALUE)) + MIN_DATA_VALUE
+				).toString();
+				if (i < RANDOM_ARRAY_SIZE - 1) {
+					values += ',';
+				}
+			}
+			this.listField.value = values;
+			this.kField.value = Math.floor(Math.random() * RANDOM_ARRAY_SIZE + 1);
+		} else {
+			values = selection.substring(0, selection.indexOf(';'));
+			this.kField.value = parseInt(selection.substring(selection.indexOf('=') + 1));
+		}
+		this.exampleDropdown.value = '';
 		this.listField.value = values;
 	}
 
@@ -225,23 +284,28 @@ export default class QuickSort extends Algorithm {
 		this.displayData = [];
 		this.compCount = 0;
 		this.swapCount = 0;
-		if (!keepInput) this.listField.value = '';
+
+		if (!keepInput) {
+			this.listField.value = '';
+			this.kField.value = '';
+		}
+
 		this.cmd(act.setText, this.infoLabelID, '');
 		this.cmd(act.setText, this.comparisonCountID, 'Comparison Count: ' + this.compCount);
 		this.cmd(act.setText, this.swapCountID, 'Swap Count: ' + this.swapCount);
 		return this.commands;
 	}
 
-	sort(list) {
+	run(list, k) {
 		this.commands = [];
 
 		// User input validation
 		if (!list.length) {
-			this.shake(this.sortButton);
+			this.shake(this.findButton);
 			this.cmd(act.setText, this.infoLabelID, 'Data must contain integers such as "3,1,2"');
 			return this.commands;
 		} else if (list.length > MAX_ARRAY_SIZE) {
-			this.shake(this.sortButton);
+			this.shake(this.findButton);
 			this.cmd(
 				act.setText,
 				this.infoLabelID,
@@ -249,20 +313,30 @@ export default class QuickSort extends Algorithm {
 			);
 			return this.commands;
 		} else if (list.map(Number).filter(x => x > 999 || Number.isNaN(x)).length) {
-			this.shake(this.sortButton);
+			this.shake(this.findButton);
 			this.cmd(
 				act.setText,
 				this.infoLabelID,
 				'Data cannot contain non-numeric values or numbers > 999',
 			);
 			return this.commands;
+		} else if (k < 1 || k > list.length) {
+			this.shake(this.findButton);
+			this.cmd(
+				act.setText,
+				this.infoLabelID,
+				'kᵗʰ element to select must be an integer between 1 and ' + list.length,
+			);
+			return this.commands;
 		}
+
+		this.k = Number(k);
 
 		this.arrayID = [];
 		this.arrayData = list
 			.map(Number)
 			.filter(x => !Number.isNaN(x))
-			.slice(0, MAX_ARRAY_SIZE);
+			.slice(0, 18);
 		this.displayData = new Array(this.arrayData.length);
 
 		const elemCounts = new Map();
@@ -303,8 +377,6 @@ export default class QuickSort extends Algorithm {
 		this.iPointerID = this.nextIndex++;
 		this.jPointerID = this.nextIndex++;
 		this.pPointerID = this.nextIndex++;
-		this.iLabel = this.nextIndex++;
-		this.jLabel = this.nextIndex++;
 		this.helper(0, this.arrayData.length - 1);
 
 		return this.commands;
@@ -320,7 +392,6 @@ export default class QuickSort extends Algorithm {
 			this.cmd(act.setBackgroundColor, this.arrayID[i], '#99CCFF');
 		}
 		this.cmd(act.step);
-		this.unhighlight(0, 0);
 
 		if (left === right) {
 			this.cmd(act.setBackgroundColor, this.arrayID[left], '#2ECC71');
@@ -328,6 +399,7 @@ export default class QuickSort extends Algorithm {
 			this.unhighlight(0, 0, this.codeID);
 			return;
 		}
+		this.unhighlight(0, 0, this.codeID);
 
 		// Create pivot pointer and swap with left-most element
 		// To make things more interesting (and clearer), we don't pick the left-most element as pivot
@@ -342,8 +414,8 @@ export default class QuickSort extends Algorithm {
 				}
 			}
 			pivot = min;
-		} else if (this.pivotType === 'first') {
-			pivot = left;
+		} else if (this.pivotType === 'set') {
+			pivot = Math.min(left + definedPivotIndex, right);
 		} else if (this.pivotType === 'perfect') {
 			const sorted = this.arrayData.slice(left, right + 1);
 			sorted.sort((a, b) => a - b);
@@ -369,37 +441,9 @@ export default class QuickSort extends Algorithm {
 		const jXPos = j * ARRAY_ELEM_WIDTH + ARRAY_START_X;
 		this.cmd(act.createHighlightCircle, this.iPointerID, '#0000FF', iXPos, ARRAY_START_Y);
 		this.cmd(act.createHighlightCircle, this.jPointerID, '#0000FF', jXPos, ARRAY_START_Y);
-		this.cmd(
-			act.createLabel,
-			this.iLabel,
-			'i',
-			iXPos,
-			ARRAY_START_Y - 40,
-			undefined,
-			false,
-			true,
-		);
-		this.cmd(
-			act.createLabel,
-			this.jLabel,
-			'j',
-			jXPos,
-			ARRAY_START_Y - 40,
-			undefined,
-			false,
-			true,
-		);
-		if (i === j) {
-			this.cmd(act.setText, this.iLabel, '');
-			this.cmd(act.setText, this.jLabel, 'i, j');
-		} else {
-			this.cmd(act.setText, this.iLabel, 'i');
-			this.cmd(act.setText, this.jLabel, 'j');
-		}
 		this.cmd(act.step);
 		this.unhighlight(4, 0, this.codeID);
 		this.highlight(5, 0, this.codeID);
-
 		while (i <= j) {
 			this.cmd(act.step);
 			this.highlight(6, 0, this.codeID);
@@ -431,13 +475,13 @@ export default class QuickSort extends Algorithm {
 			this.unhighlight(6, 2, this.codeID);
 			this.unhighlight(6, 4, this.codeID);
 			if (i <= j) {
-				this.cmd(act.setForegroundColor, this.iPointerID, '#FF0000');
-				// One additional comparison will be made in the above loop if i <= j
 				this.cmd(
 					act.setText,
 					this.comparisonCountID,
 					'Comparison Count: ' + ++this.compCount,
 				);
+				this.cmd(act.setForegroundColor, this.iPointerID, '#FF0000');
+				this.cmd(act.step);
 			}
 
 			this.highlight(9, 0, this.codeID);
@@ -473,12 +517,12 @@ export default class QuickSort extends Algorithm {
 			this.unhighlight(9, 2, this.codeID);
 			this.unhighlight(9, 4, this.codeID);
 			if (i <= j) {
-				this.cmd(act.setForegroundColor, this.jPointerID, '#FF0000');
 				this.cmd(
 					act.setText,
 					this.comparisonCountID,
 					'Comparison Count: ' + ++this.compCount,
 				);
+				this.cmd(act.setForegroundColor, this.jPointerID, '#FF0000');
 				this.cmd(act.step);
 			}
 			if (i <= j) {
@@ -503,44 +547,47 @@ export default class QuickSort extends Algorithm {
 		this.cmd(act.delete, this.iPointerID);
 		this.cmd(act.delete, this.jPointerID);
 		this.cmd(act.delete, this.pPointerID);
-		this.cmd(act.delete, this.iLabel);
-		this.cmd(act.delete, this.jLabel);
 		this.cmd(act.step);
 
 		// Un-hightlight cells in sub-array and set pivot cell to green
 		for (let i = left; i <= right; i++) {
 			this.cmd(act.setBackgroundColor, this.arrayID[i], '#FFFFFF');
 		}
-		this.cmd(act.setBackgroundColor, this.arrayID[j], '#2ECC71');
-		this.cmd(act.step);
-
 		this.highlight(18, 0, this.codeID);
 		this.cmd(act.step);
-		this.unhighlight(18, 0, this.codeID);
+		if (this.k - 1 === j) {
+			this.unhighlight(18, 0, this.codeID);
+			this.highlight(19, 0, this.codeID);
+			this.cmd(act.setBackgroundColor, this.arrayID[j], '#2ECC71');
+			this.cmd(act.step);
+			this.unhighlight(19, 0, this.codeID);
+		} else {
+			this.unhighlight(18, 0, this.codeID);
+			this.highlight(20, 0, this.codeID);
+			this.cmd(act.setBackgroundColor, this.arrayID[j], '#4DA6ff');
+			this.cmd(act.step);
 
-		this.helper(left, j - 1);
-
-		this.highlight(19, 0, this.codeID);
-		this.cmd(act.step);
-		this.unhighlight(19, 0, this.codeID);
-
-		this.helper(j + 1, right);
+			if (this.k - 1 < j) {
+				this.unhighlight(20, 0, this.codeID);
+				this.highlight(21, 0, this.codeID);
+				this.cmd(act.step);
+				this.unhighlight(21, 0, this.codeID);
+				this.helper(left, j - 1);
+			} else {
+				this.unhighlight(20, 0, this.codeID);
+				this.highlight(23, 0, this.codeID);
+				this.cmd(act.step);
+				this.unhighlight(23, 0, this.codeID);
+				this.helper(j + 1, right);
+			}
+		}
 	}
 
 	movePointers(i, j) {
 		const iXPos = i * ARRAY_ELEM_WIDTH + ARRAY_START_X;
 		this.cmd(act.move, this.iPointerID, iXPos, ARRAY_START_Y);
-		this.cmd(act.move, this.iLabel, iXPos, ARRAY_START_Y - 40);
 		const jXPos = j * ARRAY_ELEM_WIDTH + ARRAY_START_X;
 		this.cmd(act.move, this.jPointerID, jXPos, ARRAY_START_Y);
-		this.cmd(act.move, this.jLabel, jXPos, ARRAY_START_Y - 40);
-		if (i === j) {
-			this.cmd(act.setText, this.iLabel, '');
-			this.cmd(act.setText, this.jLabel, 'i, j');
-		} else {
-			this.cmd(act.setText, this.iLabel, 'i');
-			this.cmd(act.setText, this.jLabel, 'j');
-		}
 		this.cmd(act.step);
 	}
 
@@ -610,22 +657,6 @@ export default class QuickSort extends Algorithm {
 		this.cmd(act.setForegroundColor, this.jPointerID, '#0000FF');
 		this.cmd(act.step);
 	}
-
-	// toggleWorstPivot() {
-	// 	worstPivotEnabled = !worstPivotEnabled;
-	// 	if (firstPivotEnabled) {
-	// 		firstPivotEnabled = false;
-	// 		this.firstPivotToggle.checked = false;
-	// 	}
-	// }
-
-	// toggleFirstPivot() {
-	// 	firstPivotEnabled = !firstPivotEnabled;
-	// 	if (worstPivotEnabled) {
-	// 		worstPivotEnabled = false;
-	// 		this.worstPivotToggle.checked = false;
-	// 	}
-	// }
 
 	disableUI() {
 		for (let i = 0; i < this.controls.length; i++) {

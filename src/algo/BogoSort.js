@@ -27,17 +27,12 @@
 import Algorithm, {
 	addControlToAlgorithmBar,
 	addDivisorToAlgorithmBar,
-	addDropDownGroupToAlgorithmBar,
 	addGroupToAlgorithmBar,
 	addLabelToAlgorithmBar,
 } from './Algorithm.js';
 import { act } from '../anim/AnimationMain';
-import pseudocodeText from '../pseudocode.json';
 
 const MAX_ARRAY_SIZE = 18;
-
-const INFO_MSG_X = 25;
-const INFO_MSG_Y = 15;
 
 const ARRAY_START_X = 100;
 const ARRAY_START_Y = 130;
@@ -47,10 +42,10 @@ const ARRAY_ELEM_HEIGHT = 50;
 const COMP_COUNT_X = 100;
 const COMP_COUNT_Y = 50;
 
-const CODE_START_X = 50;
-const CODE_START_Y = 200;
+const WARN_START_X = 200;
+const WARN_START_Y = 200;
 
-export default class InsertionSort extends Algorithm {
+export default class BogoSort extends Algorithm {
 	constructor(am, w, h) {
 		super(am, w, h);
 		this.addControls();
@@ -64,7 +59,7 @@ export default class InsertionSort extends Algorithm {
 		const verticalGroup = addGroupToAlgorithmBar(false);
 
 		addLabelToAlgorithmBar(
-			'Comma seperated list (e.g. "3,1,2"). Max 18 elements & no elements > 999',
+			'Comma seperated list (e.g. "3,1,2"). No more than 5 elements, unless you have time to spare...',
 			verticalGroup,
 		);
 
@@ -87,20 +82,6 @@ export default class InsertionSort extends Algorithm {
 
 		addDivisorToAlgorithmBar();
 
-		// Examples dropdown
-		this.exampleDropdown = addDropDownGroupToAlgorithmBar(
-			[
-				['', 'Select Example'],
-				['1,2,3,4,5,6,7,8,9', 'Sorted'],
-				['9,8,7,6,5,4,3,2,1', 'Reverse Sorted'],
-				['2,3,4,5,6,7,8,9,1', 'Almost Sorted'],
-				['Random', 'Random'],
-			],
-			'Example',
-		);
-		this.exampleDropdown.onclick = this.exampleCallback.bind(this);
-		this.controls.push(this.exampleDropdown);
-
 		// Clear button
 		this.clearButton = addControlToAlgorithmBar('Button', 'Clear');
 		this.clearButton.onclick = this.clearCallback.bind(this);
@@ -115,37 +96,31 @@ export default class InsertionSort extends Algorithm {
 		this.iPointerID = this.nextIndex++;
 		this.jPointerID = this.nextIndex++;
 		this.comparisonCountID = this.nextIndex++;
+		this.warningID = this.nextIndex++;
+		this.iterations = 0;
 
-		this.compCount = 0;
+		this.colors = [
+			'#f0928e',
+			'#f8b896',
+			'#a9fd99',
+			'#a8fdff',
+			'#94b3f9',
+			'#ca8ff9',
+			'#f092f9',
+			'#ed74f0',
+			'#ec74b3',
+			'#ed7370',
+		];
+
 		this.cmd(
 			act.createLabel,
 			this.comparisonCountID,
-			'Comparison Count: ' + this.compCount,
+			'Iterations: ' + this.iterations,
 			COMP_COUNT_X,
 			COMP_COUNT_Y,
 		);
 
-		this.infoLabelID = this.nextIndex++;
-		this.cmd(act.createLabel, this.infoLabelID, '', INFO_MSG_X, INFO_MSG_Y, 0);
-
-		this.swapCountID = this.nextIndex++;
-		this.swapCount = 0;
-		this.cmd(
-			act.createLabel,
-			this.swapCountID,
-			'Swap Count: ' + this.swapCount,
-			COMP_COUNT_X + 250,
-			COMP_COUNT_Y,
-		);
-
-		this.pseudocode = pseudocodeText.InsertionSort;
-		this.codeID = this.addCodeToCanvasBaseAll(
-			this.pseudocode,
-			'find',
-			CODE_START_X,
-			CODE_START_Y,
-		);
-		this.resetIndex = this.nextIndex;
+		this.cmd(act.createLabel, this.warningID, '', WARN_START_X, WARN_START_Y);
 
 		this.animationManager.startNewAnimation(this.commands);
 		this.animationManager.skipForward();
@@ -153,52 +128,37 @@ export default class InsertionSort extends Algorithm {
 	}
 
 	reset() {
-		this.nextIndex = this.resetIndex;
+		this.nextIndex = 0;
 		this.arrayData = [];
 		this.arrayID = [];
 		this.displayData = [];
-		this.compCount = 0;
-		this.swapCount = 0;
-	}
-
-	exampleCallback() {
-		const selection = this.exampleDropdown.value;
-		if (!selection) {
-			return;
-		}
-
-		let values = '';
-		if (selection === 'Random') {
-			//Generate between 5 and 15 random values
-			const RANDOM_ARRAY_SIZE = Math.floor(Math.random() * 9) + 5;
-			const MIN_DATA_VALUE = 1;
-			const MAX_DATA_VALUE = 14;
-			for (let i = 0; i < RANDOM_ARRAY_SIZE; i++) {
-				values += (
-					Math.floor(Math.random() * (MAX_DATA_VALUE - MIN_DATA_VALUE)) + MIN_DATA_VALUE
-				).toString();
-				if (i < RANDOM_ARRAY_SIZE - 1) {
-					values += ',';
-				}
-			}
-		} else {
-			values = selection;
-		}
-		this.exampleDropdown.value = '';
-		this.listField.value = values;
+		this.removeCode(this.codeID);
+		this.iPointerID = this.nextIndex++;
+		this.jPointerID = this.nextIndex++;
+		this.comparisonCountID = this.nextIndex++;
+		this.warningID = this.nextIndex++;
+		this.iterations = 0;
 	}
 
 	sortCallback() {
 		const list = this.listField.value.split(',').filter(x => x !== '');
-		this.implementAction(this.clear.bind(this), true);
-		this.implementAction(this.sort.bind(this), list);
+
+		if (
+			this.listField.value !== '' &&
+			list.length <= MAX_ARRAY_SIZE &&
+			list.map(Number).filter(x => x > 999 || Number.isNaN(x)).length <= 0
+		) {
+			this.implementAction(this.clear.bind(this));
+			this.listField.value = '';
+			this.implementAction(this.sort.bind(this), list);
+		}
 	}
 
 	clearCallback() {
 		this.implementAction(this.clear.bind(this));
 	}
 
-	clear(keepInput) {
+	clear() {
 		this.commands = [];
 		for (let i = 0; i < this.arrayID.length; i++) {
 			this.cmd(act.delete, this.arrayID[i]);
@@ -206,43 +166,17 @@ export default class InsertionSort extends Algorithm {
 		this.arrayData = [];
 		this.arrayID = [];
 		this.displayData = [];
-		this.compCount = 0;
-		this.swapCount = 0;
-		if (!keepInput) this.listField.value = '';
-		this.cmd(act.setText, this.infoLabelID, '');
-		this.cmd(act.setText, this.comparisonCountID, 'Comparison Count: ' + this.compCount);
-		this.cmd(act.setText, this.swapCountID, 'Swap Count: ' + this.swapCount);
+		this.iterations = 0;
+		this.cmd(act.setText, this.comparisonCountID, 'Iterations: ' + this.iterations);
+		this.cmd(act.setText, this.warningID, '');
 		return this.commands;
 	}
 
-	sort(list) {
+	sort(params) {
 		this.commands = [];
 
-		// User input validation
-		if (!list.length) {
-			this.shake(this.sortButton);
-			this.cmd(act.setText, this.infoLabelID, 'Data must contain integers such as "3,1,2"');
-			return this.commands;
-		} else if (list.length > MAX_ARRAY_SIZE) {
-			this.shake(this.sortButton);
-			this.cmd(
-				act.setText,
-				this.infoLabelID,
-				`Data cannot contain more than ${MAX_ARRAY_SIZE} numbers (you put ${list.length})`,
-			);
-			return this.commands;
-		} else if (list.map(Number).filter(x => x > 999 || Number.isNaN(x)).length) {
-			this.shake(this.sortButton);
-			this.cmd(
-				act.setText,
-				this.infoLabelID,
-				'Data cannot contain non-numeric values or numbers > 999',
-			);
-			return this.commands;
-		}
-
 		this.arrayID = [];
-		this.arrayData = list
+		this.arrayData = params
 			.map(Number)
 			.filter(x => !Number.isNaN(x))
 			.slice(0, MAX_ARRAY_SIZE);
@@ -281,71 +215,63 @@ export default class InsertionSort extends Algorithm {
 				ypos,
 			);
 		}
-		this.cmd(
-			act.createHighlightCircle,
-			this.iPointerID,
-			'#0000FF',
-			ARRAY_START_X,
-			ARRAY_START_Y,
-		);
-		this.cmd(act.setHighlight, this.iPointerID, 1);
-		this.cmd(
-			act.createHighlightCircle,
-			this.jPointerID,
-			'#0000FF',
-			ARRAY_START_X + ARRAY_ELEM_WIDTH,
-			ARRAY_START_Y,
-		);
-		this.cmd(act.setHighlight, this.jPointerID, 1);
-		this.highlight(0, 0, this.codeID);
-		this.cmd(act.step);
-		this.unhighlight(0, 0, this.codeID);
-		this.highlight(2, 0, this.codeID);
 
-		for (let i = 1; i < this.arrayData.length; i++) {
-			this.cmd(act.step);
-			this.highlight(3, 0, this.codeID);
-			this.cmd(act.step);
-			this.unhighlight(3, 0, this.codeID);
-			this.highlight(4, 0, this.codeID);
-			for (let j = i; j >= 1; j--) {
-				this.movePointers(j - 1, j);
-				this.unhighlight(3, 0, this.codeID);
-				this.unhighlight(6, 0, this.codeID);
-				this.highlight(4, 2, this.codeID);
+		for (let i = 0; i < this.arrayData.length; i++) {
+			this.cmd(act.setBackgroundColor, this.arrayID[i], this.colors[i % this.colors.length]);
+		}
+
+		this.cmd(act.step);
+
+		if (this.arrayData.length >= 10) {
+			for (let i = 0; i < this.arrayData.length / 2; i++) {
 				this.cmd(act.step);
-				this.unhighlight(4, 2, this.codeID);
-				this.highlight(4, 4, this.codeID);
-				this.cmd(
-					act.setText,
-					this.comparisonCountID,
-					'Comparison Count: ' + ++this.compCount,
+			}
+			while (this.arrayID.length > 0) {
+				const cell = this.arrayID.splice(
+					Math.floor(Math.random() * (this.arrayID.length - 1)),
+					1,
 				);
+				this.cmd(act.delete, cell);
 				this.cmd(act.step);
-				this.unhighlight(4, 4, this.codeID);
-				if (this.arrayData[j] < this.arrayData[j - 1]) {
-					this.highlight(5, 0, this.codeID);
-					this.swap(j, j - 1);
-					this.cmd(act.step);
-					this.unhighlight(5, 0, this.codeID);
-					this.highlight(6, 0, this.codeID);
-					this.cmd(act.step);
-				} else {
+			}
+			this.arrayID = [];
+			this.arrayData = [];
+			this.displayData = [];
+			this.iterations = 0;
+			this.cmd(act.setText, this.comparisonCountID, 'Iterations: ' + this.iterations);
+			this.cmd(
+				act.setText,
+				this.warningID,
+				'Yeah so that array was too long...try something smaller',
+			);
+			return this.commands;
+		}
+
+		let sorted = false;
+		while (!sorted) {
+			this.cmd(act.setText, this.comparisonCountID, 'Iterations: ' + this.iterations++);
+			sorted = true;
+
+			for (let i = 0; i < length - 1; i++) {
+				if (this.arrayData[i] > this.arrayData[i + 1]) {
+					sorted = false;
 					break;
 				}
 			}
-			this.cmd(act.step);
-			this.unhighlight(3, 0, this.codeID);
-			this.unhighlight(4, 0, this.codeID);
-			this.unhighlight(6, 0, this.codeID);
-			if (i === 1) this.cmd(act.setBackgroundColor, this.arrayID[0], '#2ECC71');
-			this.cmd(act.setBackgroundColor, this.arrayID[i], '#2ECC71');
+			if (!sorted) {
+				this.shuffle();
+			} else {
+				for (let i = 0; i < length; i++) {
+					this.cmd(
+						act.setBackgroundColor,
+						this.arrayID[i],
+						this.colors[i % this.colors.length],
+					);
+				}
+			}
 			this.cmd(act.step);
 		}
-		this.unhighlight(2, 0, this.codeID);
 
-		this.cmd(act.delete, this.iPointerID);
-		this.cmd(act.delete, this.jPointerID);
 		this.cmd(act.step);
 
 		return this.commands;
@@ -361,27 +287,20 @@ export default class InsertionSort extends Algorithm {
 		this.cmd(act.step);
 	}
 
+	shuffle() {
+		for (let i = 0; i < this.arrayData.length; i++) {
+			this.swap(i, Math.floor(Math.random() * (this.arrayData.length - 1)));
+			this.cmd(
+				act.setBackgroundColor,
+				this.arrayID[i],
+				this.colors[Math.abs(this.iterations - i) % this.colors.length],
+			);
+		}
+	}
+
 	swap(i, j) {
-		this.cmd(act.setForegroundColor, this.iPointerID, '#FF0000');
-		this.cmd(act.setForegroundColor, this.jPointerID, '#FF0000');
-		const iLabelID = this.nextIndex++;
-		const iXPos = i * ARRAY_ELEM_WIDTH + ARRAY_START_X;
-		const iYPos = ARRAY_START_Y;
-		this.cmd(act.createLabel, iLabelID, this.displayData[i], iXPos, iYPos);
-		const jLabelID = this.nextIndex++;
-		const jXPos = j * ARRAY_ELEM_WIDTH + ARRAY_START_X;
-		const jYPos = ARRAY_START_Y;
-		this.cmd(act.createLabel, jLabelID, this.displayData[j], jXPos, jYPos);
-		this.cmd(act.setText, this.arrayID[i], '');
-		this.cmd(act.setText, this.arrayID[j], '');
-		this.cmd(act.move, iLabelID, jXPos, jYPos);
-		this.cmd(act.move, jLabelID, iXPos, iYPos);
-		this.cmd(act.setText, this.swapCountID, 'Swap Count: ' + ++this.swapCount);
-		this.cmd(act.step);
 		this.cmd(act.setText, this.arrayID[i], this.displayData[j]);
 		this.cmd(act.setText, this.arrayID[j], this.displayData[i]);
-		this.cmd(act.delete, iLabelID);
-		this.cmd(act.delete, jLabelID);
 
 		// Swap data in backend array
 		let temp = this.arrayData[i];
@@ -392,10 +311,6 @@ export default class InsertionSort extends Algorithm {
 		temp = this.displayData[i];
 		this.displayData[i] = this.displayData[j];
 		this.displayData[j] = temp;
-
-		this.cmd(act.setForegroundColor, this.iPointerID, '#0000FF');
-		this.cmd(act.setForegroundColor, this.jPointerID, '#0000FF');
-		this.cmd(act.step);
 	}
 
 	disableUI() {
